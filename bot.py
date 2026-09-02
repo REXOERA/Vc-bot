@@ -9,8 +9,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     try:
-        synced = await bot.tree.sync()
-        print(f"Logged in as {bot.user}. Synced {len(synced)} commands.")
+        guild = discord.Object(id=1526966069149831229)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"Synced {len(synced)} commands")
     except Exception as e:
         print("Sync error:", e)
 
