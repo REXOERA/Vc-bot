@@ -34,7 +34,7 @@ async def join(interaction: discord.Interaction):
 
     if not interaction.user.voice:
         await interaction.response.send_message(
-            "Pehle voice channel me join ho jao."
+            "Abe phele voice channel join kr."
         )
         return
 
