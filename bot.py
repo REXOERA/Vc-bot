@@ -1,4 +1,4 @@
-import os
+    import os
 import asyncio
 import discord
 from discord import app_commands
@@ -16,7 +16,7 @@ YTDL_OPTIONS = {
     "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
-    "default_search": "ytsearch",
+    "default_search": "ytsearch1",
 }
 
 FFMPEG_OPTIONS = {
@@ -28,7 +28,6 @@ FFMPEG_OPTIONS = {
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} commands")
@@ -40,21 +39,24 @@ async def on_ready():
 async def join(interaction: discord.Interaction):
     await interaction.response.defer()
 
-    if not interaction.user.voice or not interaction.user.voice.channel:
-        await interaction.followup.send("Pehle voice channel me join ho jao.")
+    if not interaction.user.voice:
+        await interaction.followup.send("❌ Pehle voice channel join karo.")
         return
 
     channel = interaction.user.voice.channel
 
     try:
-        if interaction.guild.voice_client:
-            await interaction.guild.voice_client.move_to(channel)
+        voice = interaction.guild.voice_client
+
+        if voice:
+            await voice.move_to(channel)
         else:
             await channel.connect()
 
-        await interaction.followup.send(f"Joined **{channel.name}** 🎵")
+        await interaction.followup.send(f"✅ Joined **{channel.name}** 🎵")
+
     except Exception as e:
-        await interaction.followup.send(f"Join error: `{e}`")
+        await interaction.followup.send(f"❌ Join error: `{e}`")
 
 
 @bot.tree.command(name="leave", description="Leave the voice channel")
@@ -65,18 +67,18 @@ async def leave(interaction: discord.Interaction):
 
     if voice:
         await voice.disconnect()
-        await interaction.followup.send("Voice channel se leave kar diya 👋")
+        await interaction.followup.send("👋 Voice channel se nikal gaya.")
     else:
-        await interaction.followup.send("Main kisi voice channel me nahi hoon.")
+        await interaction.followup.send("❌ Main kisi voice channel mein nahi hoon.")
 
 
-@bot.tree.command(name="play", description="Play a YouTube song")
+@bot.tree.command(name="play", description="Play a song")
 @app_commands.describe(query="Song name or YouTube URL")
 async def play(interaction: discord.Interaction, query: str):
     await interaction.response.defer()
 
-    if not interaction.user.voice or not interaction.user.voice.channel:
-        await interaction.followup.send("Pehle voice channel me join ho jao.")
+    if not interaction.user.voice:
+        await interaction.followup.send("❌ Pehle voice channel join karo.")
         return
 
     channel = interaction.user.voice.channel
@@ -97,7 +99,7 @@ async def play(interaction: discord.Interaction, query: str):
                 if "entries" in info:
                     info = info["entries"][0]
 
-                return info["url"], info.get("title", "Unknown")
+                return info["url"], info.get("title", "Unknown Song")
 
         audio_url, title = await loop.run_in_executor(None, get_audio)
 
@@ -111,17 +113,24 @@ async def play(interaction: discord.Interaction, query: str):
 
         voice.play(source)
 
-        await interaction.followup.send(f"▶️ Playing **{title}**")
+        await interaction.followup.send(f"▶️ Playing **{title}** 🎵")
 
     except Exception as e:
-        await interaction.followup.send(f"Play error: `{e}`")
+        print("PLAY ERROR:", repr(e))
+        await interaction.followup.send(
+            "❌ Song play nahi ho saka. Railway logs me error check karo."
+        )
 
 
 @bot.tree.command(name="stop", description="Stop the current song")
 async def stop(interaction: discord.Interaction):
-    await interaction.response.defer()
-
     voice = interaction.guild.voice_client
 
     if voice and voice.is_playing():
-       
+        voice.stop()
+        await interaction.response.send_message("⏹️ Song stopped.")
+    else:
+        await interaction.response.send_message("❌ Abhi koi song nahi baj raha.")
+
+
+bot.run(TOKEN)
