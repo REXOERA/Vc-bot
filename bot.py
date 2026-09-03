@@ -6,7 +6,8 @@ from discord.ext import commands
 import yt_dlp
 
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", 
+                   intents=intents)
 
 
 
