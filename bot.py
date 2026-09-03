@@ -12,6 +12,7 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# SoundCloud / yt-dlp settings
 YTDL_OPTIONS = {
     "format": "bestaudio/best",
     "noplaylist": True,
@@ -27,6 +28,7 @@ FFMPEG_OPTIONS = {
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
     try:
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} commands")
@@ -34,12 +36,22 @@ async def on_ready():
         print("Sync error:", e)
 
 
-@bot.tree.command(name="join", description="Join your voice channel")
+# =========================
+# JOIN
+# =========================
+
+@bot.tree.command(
+    name="join",
+    description="Join your voice channel"
+)
 async def join(interaction: discord.Interaction):
+
     await interaction.response.defer()
 
     if not interaction.user.voice:
-        await interaction.followup.send("❌ Pehle voice channel join karo.")
+        await interaction.followup.send(
+            "❌ Pehle voice channel join karo."
+        )
         return
 
     channel = interaction.user.voice.channel
@@ -52,91 +64,186 @@ async def join(interaction: discord.Interaction):
         else:
             await channel.connect()
 
-        await interaction.followup.send(f"✅ Joined **{channel.name}** 🎵")
+        await interaction.followup.send(
+            f"✅ Joined **{channel.name}** 🎵"
+        )
 
     except Exception as e:
-        await interaction.followup.send(f"❌ Join error: `{e}`")
+        print("JOIN ERROR:", repr(e))
+
+        await interaction.followup.send(
+            f"❌ Join error: `{e}`"
+        )
 
 
-@bot.tree.command(name="leave", description="Leave the voice channel")
+# =========================
+# LEAVE
+# =========================
+
+@bot.tree.command(
+    name="leave",
+    description="Leave the voice channel"
+)
 async def leave(interaction: discord.Interaction):
+
     await interaction.response.defer()
 
     voice = interaction.guild.voice_client
 
     if voice:
         await voice.disconnect()
-        await interaction.followup.send("👋 Voice channel se nikal gaya.")
+
+        await interaction.followup.send(
+            "👋 Voice channel se nikal gaya."
+        )
     else:
-        await interaction.followup.send("❌ Main kisi voice channel mein nahi hoon.")
+        await interaction.followup.send(
+            "❌ Main kisi voice channel mein nahi hoon."
+        )
 
 
-@bot.tree.command(name="play", description="Play a song")
-@app_commands.describe(query="Song name or YouTube URL")
-async def play(interaction: discord.Interaction, query: str):
+# =========================
+# PLAY
+# =========================
+
+@bot.tree.command(
+    name="play",
+    description="Play a SoundCloud song"
+)
+@app_commands.describe(
+    query="Song name or SoundCloud URL"
+)
+async def play(
+    interaction: discord.Interaction,
+    query: str
+):
+
     await interaction.response.defer()
 
     if not interaction.user.voice:
-        await interaction.followup.send("❌ Pehle voice channel join karo.")
+        await interaction.followup.send(
+            "❌ Pehle voice channel join karo."
+        )
         return
 
     channel = interaction.user.voice.channel
-    voice = interaction.guild.voice_client
 
     try:
+
+        # Connect / move bot
+        voice = interaction.guild.voice_client
+
         if voice is None:
             voice = await channel.connect()
+
         elif voice.channel != channel:
             await voice.move_to(channel)
 
         loop = asyncio.get_running_loop()
 
+        # Get SoundCloud audio
         def get_audio():
+
             with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
 
-                # 🔎 Song name ko YouTube search me convert karega
-                if not query.startswith(("http://", "https://")):
-                    search_query = "ytsearch1:" + query
-                else:
+                # If URL is provided
+                if query.startswith(
+                    ("http://", "https://")
+                ):
                     search_query = query
 
-                info = ydl.extract_info(search_query, download=False)
+                # Otherwise search SoundCloud
+                else:
+                    search_query = "scsearch1:" + query
+
+                info = ydl.extract_info(
+                    search_query,
+                    download=False
+                )
 
                 if "entries" in info:
-                    info = info["entries"][0]
+                    entries = info["entries"]
 
-                return info["url"], info.get("title", "Unknown Song")
+                    if not entries:
+                        raise Exception(
+                            "Song nahi mila."
+                        )
 
-        audio_url, title = await loop.run_in_executor(None, get_audio)
+                    info = entries[0]
 
+                return (
+                    info["url"],
+                    info.get(
+                        "title",
+                        "Unknown Song"
+                    )
+                )
+
+        audio_url, title = await loop.run_in_executor(
+            None,
+            get_audio
+        )
+
+        # Stop previous song
         if voice.is_playing():
             voice.stop()
 
+        # Create audio source
         source = discord.FFmpegPCMAudio(
             audio_url,
             **FFMPEG_OPTIONS
         )
 
+        # Play
         voice.play(source)
 
-        await interaction.followup.send(f"▶️ Playing **{title}** 🎵")
+        await interaction.followup.send(
+            f"▶️ Playing **{title}** 🎵\n"
+            f"🔊 Source: SoundCloud"
+        )
 
     except Exception as e:
+
         print("PLAY ERROR:", repr(e))
+
         await interaction.followup.send(
-            f"❌ Song play nahi ho saka.\n`{e}`"
+            "❌ Song play nahi ho saka.\n"
+            f"Error: `{e}`"
         )
 
 
-@bot.tree.command(name="stop", description="Stop the current song")
+# =========================
+# STOP
+# =========================
+
+@bot.tree.command(
+    name="stop",
+    description="Stop the current song"
+)
 async def stop(interaction: discord.Interaction):
+
     voice = interaction.guild.voice_client
 
     if voice and voice.is_playing():
+
         voice.stop()
-        await interaction.response.send_message("⏹️ Song stopped.")
+
+        await interaction.response.send_message(
+            "⏹️ Song stopped."
+        )
+
     else:
-        await interaction.response.send_message("❌ Abhi koi song nahi baj raha.")
+
+        await interaction.response.send_message(
+            "❌ Abhi koi song nahi baj raha."
+        )
 
 
-bot.run(TOKEN)
+# =========================
+# START BOT
+# =========================
+
+if not TOKEN:
+    print("❌ DISCORD_TOKEN variable nahi mila!")
+else:
+    bot.run(TOKEN)
