@@ -5,162 +5,123 @@ from discord import app_commands
 from discord.ext import commands
 import yt_dlp
 
+TOKEN = os.getenv("DISCORD_TOKEN")
+
 intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!",intents=intents)
+intents.message_content = True
 
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-GUILD_ID = 1526966069149831229
+YTDL_OPTIONS = {
+    "format": "bestaudio/best",
+    "noplaylist": True,
+    "quiet": True,
+    "default_search": "ytsearch",
+}
+
+FFMPEG_OPTIONS = {
+    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "options": "-vn",
+}
 
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-    guild = bot.get_guild(GUILD_ID)
-
-    if guild is None:
-        print("ERROR: Bot ko ye server nahi mil raha.")
-        return
-
     try:
-        synced = await bot.tree.sync(guild=guild)
+        synced = await bot.tree.sync()
         print(f"Synced {len(synced)} commands")
     except Exception as e:
         print("Sync error:", e)
 
 
-@bot.tree.command(
-    name="join",
-    description="Join your voice channel",
-    guild=discord.Object(id=GUILD_ID)
-)
+@bot.tree.command(name="join", description="Join your voice channel")
 async def join(interaction: discord.Interaction):
+    await interaction.response.defer()
 
-    if not interaction.user.voice:
-        await interaction.response.send_message(
-            "Abe phele voice channel join kr."
-        )
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.followup.send("Pehle voice channel me join ho jao.")
         return
 
     channel = interaction.user.voice.channel
 
-    if interaction.guild.voice_client:
-        await interaction.guild.voice_client.move_to(channel)
-    else:
-        await channel.connect()
+    try:
+        if interaction.guild.voice_client:
+            await interaction.guild.voice_client.move_to(channel)
+        else:
+            await channel.connect()
 
-    await interaction.response.send_message(
-        f"Joined **{channel.name}** 🎵"
-    )
+        await interaction.followup.send(f"Joined **{channel.name}** 🎵")
+    except Exception as e:
+        await interaction.followup.send(f"Join error: `{e}`")
 
 
-@bot.tree.command(
-    name="leave",
-    description="Leave the voice channel",
-    guild=discord.Object(id=GUILD_ID)
-)
+@bot.tree.command(name="leave", description="Leave the voice channel")
 async def leave(interaction: discord.Interaction):
-
-    vc = interaction.guild.voice_client
-
-    if not vc:
-        await interaction.response.send_message(
-            "Bot voice channel me nahi hai."
-        )
-        return
-
-    await vc.disconnect()
-    await interaction.response.send_message(
-        "Voice channel leave kar diya."
-    )
-
-
-@bot.tree.command(
-    name="play",
-    description="Play a YouTube video",
-    guild=discord.Object(id=GUILD_ID)
-)
-@app_commands.describe(url="YouTube video URL")
-async def play(interaction: discord.Interaction, url: str):
-
-    vc = interaction.guild.voice_client
-
-    if not vc:
-        await interaction.response.send_message(
-            "Pehle `/join` use karo."
-        )
-        return
-
     await interaction.response.defer()
 
-    if vc.is_playing():
-        vc.stop()
+    voice = interaction.guild.voice_client
 
-    ydl_opts = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-    }
+    if voice:
+        await voice.disconnect()
+        await interaction.followup.send("Voice channel se leave kar diya 👋")
+    else:
+        await interaction.followup.send("Main kisi voice channel me nahi hoon.")
+
+
+@bot.tree.command(name="play", description="Play a YouTube song")
+@app_commands.describe(query="Song name or YouTube URL")
+async def play(interaction: discord.Interaction, query: str):
+    await interaction.response.defer()
+
+    if not interaction.user.voice or not interaction.user.voice.channel:
+        await interaction.followup.send("Pehle voice channel me join ho jao.")
+        return
+
+    channel = interaction.user.voice.channel
+    voice = interaction.guild.voice_client
 
     try:
-        def get_info():
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                return ydl.extract_info(url, download=False)
+        if voice is None:
+            voice = await channel.connect()
+        elif voice.channel != channel:
+            await voice.move_to(channel)
 
-        info = await asyncio.to_thread(get_info)
+        loop = asyncio.get_running_loop()
 
-        stream_url = info["url"]
-        title = info.get("title", "Unknown")
+        def get_audio():
+            with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
+                info = ydl.extract_info(query, download=False)
 
-        ffmpeg_options = {
-            "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
-            "options": "-vn"
-        }
+                if "entries" in info:
+                    info = info["entries"][0]
+
+                return info["url"], info.get("title", "Unknown")
+
+        audio_url, title = await loop.run_in_executor(None, get_audio)
+
+        if voice.is_playing():
+            voice.stop()
 
         source = discord.FFmpegPCMAudio(
-            stream_url,
-            **ffmpeg_options
+            audio_url,
+            **FFMPEG_OPTIONS
         )
 
-        vc.play(source)
+        voice.play(source)
 
-        await interaction.followup.send(
-            f"▶️ Playing: **{title}**"
-        )
+        await interaction.followup.send(f"▶️ Playing **{title}**")
 
     except Exception as e:
-        print("Play error:", e)
-        await interaction.followup.send(
-            "❌ YouTube audio play nahi ho saka."
-        )
+        await interaction.followup.send(f"Play error: `{e}`")
 
 
-@bot.tree.command(
-    name="stop",
-    description="Stop the current song",
-    guild=discord.Object(id=GUILD_ID)
-)
+@bot.tree.command(name="stop", description="Stop the current song")
 async def stop(interaction: discord.Interaction):
+    await interaction.response.defer()
 
-    vc = interaction.guild.voice_client
+    voice = interaction.guild.voice_client
 
-    if vc and vc.is_playing():
-        vc.stop()
-        await interaction.response.send_message(
-            "⏹️ Song stopped."
-        )
-    else:
-        await interaction.response.send_message(
-            "Abhi koi song nahi baj raha."
-        )
-
-
-token = os.getenv("DISCORD_TOKEN")
-
-if not token:
-    raise RuntimeError(
-        "DISCORD_TOKEN environment variable missing!"
-    )
-
-bot.run(token)
+    if voice and voice.is_playing():
+       
