@@ -14,11 +14,17 @@ GUILD_ID = 1526966069149831229
 
 @bot.event
 async def on_ready():
+    print(f"Logged in as {bot.user}")
+
+    guild = bot.get_guild(GUILD_ID)
+
+    if guild is None:
+        print("ERROR: Bot ko ye server nahi mil raha.")
+        return
+
     try:
-        guild = discord.Object(id=GUILD_ID)
         synced = await bot.tree.sync(guild=guild)
         print(f"Synced {len(synced)} commands")
-        print(f"Logged in as {bot.user}")
     except Exception as e:
         print("Sync error:", e)
 
