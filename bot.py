@@ -7,9 +7,7 @@ import yt_dlp
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", 
-                   intents=intents)
-
-
+intents=intents))
 
 GUILD_ID = 15269660691498312
 
