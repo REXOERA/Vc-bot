@@ -9,7 +9,7 @@ intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-1526966069149831229
+
 GUILD_ID = 15269660691498312
 
 
