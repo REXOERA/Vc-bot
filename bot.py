@@ -1,4 +1,4 @@
-    import os
+import os
 import asyncio
 import discord
 from discord import app_commands
@@ -16,7 +16,6 @@ YTDL_OPTIONS = {
     "format": "bestaudio/best",
     "noplaylist": True,
     "quiet": True,
-    "default_search": "ytsearch1",
 }
 
 FFMPEG_OPTIONS = {
@@ -94,7 +93,14 @@ async def play(interaction: discord.Interaction, query: str):
 
         def get_audio():
             with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
-                info = ydl.extract_info(query, download=False)
+
+                # 🔎 Song name ko YouTube search me convert karega
+                if not query.startswith(("http://", "https://")):
+                    search_query = "ytsearch1:" + query
+                else:
+                    search_query = query
+
+                info = ydl.extract_info(search_query, download=False)
 
                 if "entries" in info:
                     info = info["entries"][0]
@@ -118,7 +124,7 @@ async def play(interaction: discord.Interaction, query: str):
     except Exception as e:
         print("PLAY ERROR:", repr(e))
         await interaction.followup.send(
-            "❌ Song play nahi ho saka. Railway logs me error check karo."
+            f"❌ Song play nahi ho saka.\n`{e}`"
         )
 
 
