@@ -240,4 +240,4 @@ async def leave(interaction: discord.Interaction):
     )
 
 
-bot.run(TOKEN
+bot.run(TOKEN)
