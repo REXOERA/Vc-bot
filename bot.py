@@ -211,5 +211,6 @@ async def leave(interaction: discord.Interaction):
         await player.disconnect()
 
         await interaction.followup.send(
-            "👋 Voice channel se nikal gaya."
+    "👋 Voice channel se nikal gaya."
+        )
        
