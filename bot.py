@@ -263,6 +263,3 @@ if not TOKEN:
     print("❌ DISCORD_TOKEN variable nahi mila!")
 else:
     bot.run(TOKEN)
-
-
-    
